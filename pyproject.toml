@@ -1,0 +1,76 @@
+[project]
+name = "featurium"
+version = "0.1.0"
+description = """
+Featurium is a lightweight, Python-based feature store designed to simplify the management and serving of machine learning features.
+It provides a simple yet powerful interface for feature engineering, storage, and retrieval, making it ideal for data scientists and ML engineers
+working on small to medium-sized projects.
+"""
+authors = [{ name = "Your Name", email = "you@example.com" }]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = ["sqlalchemy (>=2.0.40,<3.0.0)", "pydantic (>=2.11.4,<3.0.0)"]
+
+[tool.poetry]
+
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+isort = "^6.0.1"
+pre-commit = "^4.2.0"
+flask = "^3.1.0"
+flake8-simplify = "^0.21.0"
+flake8-bugbear = "^24.12.12"
+flake8-docstrings = "^1.7.0"
+flake8-pyproject = "^1.2.3"
+bandit = "^1.8.3"
+pytest = "^8.3.5"
+flake8 = "^7.2.0"
+pytest-cov = "^6.1.1"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+line_length = 88
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "D205"]
+max-complexity = 10
+exclude = [".git", "__pycache__", "build", "dist", "*.egg-info"]
+docstring-style = "google"
+ignore = [
+    "D100", # D100: Missing docstring in public module,
+    "D104", # D104: Missing docstring in public package
+    "D401", # D401: Should be in imperative mood
+    "D400", # D400: end with a period
+    "D200", # D200: One-line docstring should fit on one line with quotes
+]
+
+# [tool.mypy]
+# python_version = "3.8"
+# warn_return_any = true
+# warn_unused_configs = true
+# disallow_untyped_defs = true
+# check_untyped_defs = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
+
+[tool.pytest.ini_options]
+addopts = "-vvv --cov=featurium --cov-report=term-missing --cov-config=.coveragerc"
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

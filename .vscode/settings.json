@@ -16,5 +16,6 @@
     "editor.formatOnSaveMode": "modifications",
     "[toml]": {
         "editor.defaultFormatter": "tamasfe.even-better-toml"
-    }
+    },
+    "python.pythonPath": "/Users/jloscalzo/Projects/tesina/feature-store-tesina/.venv/bin/python"
 }

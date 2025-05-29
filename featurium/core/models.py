@@ -11,7 +11,7 @@ from typing import Any, List, Optional
 
 from sqlalchemy import JSON, DateTime
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 
 Base = declarative_base()
@@ -34,11 +34,16 @@ class IdentifiableMixin:
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
 
-class ExtraDataMixin:
-    """Base mixin for all models with common fields"""
+class NamedMixin:
+    """Mixin for all models with common fields"""
 
     name: Mapped[str] = mapped_column(String(255), default="")
     description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+
+
+class ExtraDataMixin:
+    """Base mixin for all models with common fields"""
+
     meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
 
@@ -60,19 +65,27 @@ class UserTrackingMixin:
     updated_by: Mapped[str] = mapped_column(String(255), default="UNKNOWN")
 
 
-class TrackingMixin(TimestampMixin, UserTrackingMixin):
-    """Mixin for tracking creation and update timestamps"""
-
-    pass
-
-
 class BaseModel(
     Base,
     IdentifiableMixin,
+    NamedMixin,
+    TimestampMixin,
+    UserTrackingMixin,
     ExtraDataMixin,
-    TrackingMixin,
 ):
     """Base entity class that includes all common mixins"""
+
+    __abstract__ = True
+
+
+class BaseValueModel(
+    Base,
+    IdentifiableMixin,
+    TimestampMixin,
+    UserTrackingMixin,
+    ExtraDataMixin,
+):
+    """Base value model that includes all common mixins"""
 
     __abstract__ = True
 
@@ -90,6 +103,7 @@ class Project(BaseModel):
     """Project model that contains features and other related entities"""
 
     __tablename__ = "projects"
+    __table_args__ = (UniqueConstraint("name", name="ux_projects_name"),)
 
     # Relationships
     features: Mapped[List["Feature"]] = relationship(back_populates="project")
@@ -105,6 +119,9 @@ class Feature(BaseModel):
     """Feature model representing a measurable attribute"""
 
     __tablename__ = "features"
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="ux_features_project_id_name"),
+    )
 
     # Columns
     data_type: Mapped[DataType] = mapped_column(SQLEnum(DataType))
@@ -136,14 +153,20 @@ class Feature(BaseModel):
         return f"Feature(id={self.id}, name='{self.name}', type={self.data_type})"
 
 
-class FeatureValue(BaseModel):
+class FeatureValue(BaseValueModel):
     """FeatureValue model storing actual values for features"""
 
     __tablename__ = "feature_values"
-
+    __table_args__ = (
+        UniqueConstraint(
+            "feature_id",
+            "timestamp",
+            name="ux_feature_values_feature_id_timestamp",
+        ),
+    )
     # Columns
     value: Mapped[dict] = mapped_column(JSON)
-    data_type: Mapped[DataType] = mapped_column(SQLEnum(DataType))
+
     timestamp: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC)
     )
@@ -157,14 +180,6 @@ class FeatureValue(BaseModel):
         back_populates="feature_values", secondary="feature_join_key_values"
     )
 
-    @property
-    def value_scalar(self) -> Any:
-        """Get the scalar value from the JSON value based on data_type."""
-        if not self.value or self.data_type.value not in self.value:
-            return None
-        # TODO: handle parse types
-        return self.value[self.data_type.value]
-
     def __repr__(self) -> str:
         """String representation of the FeatureValue model"""
         return (
@@ -172,12 +187,22 @@ class FeatureValue(BaseModel):
             f"value={self.value_scalar})"
         )
 
+    @property
+    def value_scalar(self) -> Any:
+        """Get the scalar value from the JSON value based on data_type."""
+        if not self.value or self.feature.data_type.value not in self.value:
+            return None
+
+        return self.value[self.feature.data_type.value]
+
 
 class Entity(BaseModel):
     """Entity model representing a business object (e.g., trip)"""
 
     __tablename__ = "entities"
-
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="ux_entities_project_id_name"),
+    )
     # Foreign keys
     project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True
@@ -204,9 +229,14 @@ class JoinKey(BaseModel):
     """JoinKey model storing actual values for join keys"""
 
     __tablename__ = "join_keys"
-
+    __table_args__ = (
+        UniqueConstraint("entity_id", "key", name="ux_join_keys_entity_id_key"),
+    )
     # Columns
     key: Mapped[str] = mapped_column(String(255))
+    data_type: Mapped[DataType] = mapped_column(
+        SQLEnum(DataType), default=DataType.STRING
+    )
 
     # Foreign keys
     entity_id: Mapped[int] = mapped_column(ForeignKey("entities.id"))
@@ -238,16 +268,13 @@ class FeatureEntities(Association):
         )
 
 
-class JoinKeyValue(BaseModel):
+class JoinKeyValue(BaseValueModel):
     """JoinKeyValue model storing actual values for join keys"""
 
     __tablename__ = "join_key_values"
 
-    # Columns
-    value: Mapped[dict] = mapped_column(JSON)
-    data_type: Mapped[DataType] = mapped_column(SQLEnum(DataType))
-
     # Foreign keys
+    value: Mapped[dict] = mapped_column(JSON)
     join_key_id: Mapped[int] = mapped_column(ForeignKey("join_keys.id"))
 
     # Relationships
@@ -259,19 +286,20 @@ class JoinKeyValue(BaseModel):
         back_populates="join_key_values", secondary="target_join_key_values"
     )
 
-    @property
-    def value_scalar(self) -> Any:
-        """Get the scalar value from the JSON value based on data_type."""
-        if not self.value or self.data_type.value not in self.value:
-            return None
-        return self.value[self.data_type.value]
-
     def __repr__(self) -> str:
         """String representation of the JoinKeyValue model"""
         return (
             f"JoinKeyValue(id={self.id}, key='{self.join_key.key}', "
             f"value={self.value_scalar})"
         )
+
+    @property
+    def value_scalar(self) -> Any:
+        """Get the scalar value from the JSON value based on data_type."""
+        if not self.value or self.join_key.data_type.value not in self.value:
+            return None
+
+        return self.value[self.join_key.data_type.value]
 
 
 class FeatureJoinKeyValue(Association):
@@ -292,6 +320,11 @@ class Target(BaseModel):
     """Target model for tracking target variables"""
 
     __tablename__ = "targets"
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="ux_targets_project_id_name"),
+    )
+    # Columns
+    data_type: Mapped[DataType] = mapped_column(SQLEnum(DataType))
 
     # Foreign keys
     project_id: Mapped[Optional[int]] = mapped_column(
@@ -317,14 +350,20 @@ class Target(BaseModel):
         return f"Target(id={self.id}, name='{self.name}')"
 
 
-class TargetValue(BaseModel):
+class TargetValue(BaseValueModel):
     """TargetValue model storing actual values for targets"""
 
     __tablename__ = "target_values"
+    __table_args__ = (
+        UniqueConstraint(
+            "target_id",
+            "timestamp",
+            name="ux_target_values_target_id_timestamp",
+        ),
+    )
 
     # Columns
     value: Mapped[dict] = mapped_column(JSON)
-    data_type: Mapped[DataType] = mapped_column(SQLEnum(DataType))
     timestamp: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC)
     )
@@ -339,19 +378,20 @@ class TargetValue(BaseModel):
         secondary="target_join_key_values",
     )
 
-    @property
-    def value_scalar(self) -> Any:
-        """Get the scalar value from the JSON value based on data_type."""
-        if not self.value or self.data_type.value not in self.value:
-            return None
-        return self.value[self.data_type.value]
-
     def __repr__(self) -> str:
         """String representation of the TargetValue model"""
         return (
             f"TargetValue(id={self.id}, target='{self.target.name}', "
             f"value={self.value_scalar})"
         )
+
+    @property
+    def value_scalar(self) -> Any:
+        """Get the scalar value from the JSON value based on data_type."""
+        if not self.value or self.target.data_type.value not in self.value:
+            return None
+
+        return self.value[self.target.data_type.value]
 
 
 class TargetEntities(Association):

@@ -68,7 +68,7 @@ class TestModelConstraints:
     """Test the constraints of the models"""
 
     def test_project__unique_name(self, db: Session) -> None:
-        """Test the creation and saving of a project with a unique name"""
+        """Test the creation of a project with a unique name"""
         project_name = f"Test Project {str(uuid.uuid4())}"
         project1 = Project(name=project_name)
         db.add(project1)
@@ -79,7 +79,7 @@ class TestModelConstraints:
             db.commit()
 
     def test_feature__unique_name_per_project(self, db: Session) -> None:
-        """Test the creation and saving of a feature with a unique name"""
+        """Test the creation of a feature with a unique name"""
         project = Project(name=f"Test Project {str(uuid.uuid4())}")
         db.add(project)
         db.commit()
@@ -100,7 +100,7 @@ class TestModelConstraints:
             db.commit()
 
     def test_feature__not_unique_name_between_projects(self, db: Session) -> None:
-        """Test the creation and saving of a feature with a unique name"""
+        """Test the creation of a feature with a unique name"""
         project1 = Project(name=f"Test Project {str(uuid.uuid4())}")
         project2 = Project(name=f"Test Project {str(uuid.uuid4())}")
         db.add_all([project1, project2])
@@ -123,8 +123,61 @@ class TestModelConstraints:
         except IntegrityError:
             pytest.fail("Feature name should be unique per project")
 
+    def test_feature_value__unique_per_timestamp(self, db: Session) -> None:
+        """Test the creation of a feature value with a unique timestamp"""
+        feature = Feature(
+            name=f"Test Feature {str(uuid.uuid4())}",
+            data_type=DataType.FLOAT,
+        )
+        db.add(feature)
+        db.flush()
+        timestamp = datetime.now(UTC)
+        feature_value1 = FeatureValue(
+            value={"float": 1.0},
+            feature=feature,
+            timestamp=timestamp,
+        )
+        db.add(feature_value1)
+        db.flush()
+        feature_value2 = FeatureValue(
+            value={"float": 10.0},
+            feature=feature,
+            timestamp=timestamp,
+        )
+        with pytest.raises(IntegrityError):
+            db.add(feature_value2)
+            db.commit()
+
+    def test_feature_value__unique_per_timestamp__store_multiple_values(
+        self, db: Session
+    ) -> None:
+        """Test the creation of multiples feature values for the same feature"""
+        feature = Feature(name="Test Feature", data_type=DataType.FLOAT)
+        db.add(feature)
+        db.flush()
+        feature_value1 = FeatureValue(
+            value={"float": 1.0},
+            feature=feature,
+            timestamp=datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC),
+        )
+        db.add(feature_value1)
+        db.flush()
+        feature_value2 = FeatureValue(
+            value={"float": 10.0},
+            feature=feature,
+            timestamp=datetime(2025, 1, 1, 12, 0, 1, tzinfo=UTC),
+        )
+        db.add(feature_value2)
+
+        try:
+            db.commit()
+        except IntegrityError:
+            pytest.fail("Feature value should be unique per timestamp")
+
+        assert len(db.query(FeatureValue).all()) == 2
+
     def test_entity__unique_name_per_project(self, db: Session) -> None:
-        """Test the creation and saving of an entity with a unique name"""
+        """Test the creation of an entity with a unique name"""
         project = Project(name=f"Test Project {str(uuid.uuid4())}")
         db.add(project)
         db.commit()
@@ -138,7 +191,7 @@ class TestModelConstraints:
             db.commit()
 
     def test_entity__not_unique_name_between_projects(self, db: Session) -> None:
-        """Test the creation and saving of an entity with a unique name"""
+        """Test the creation of an entity with a unique name"""
         project1 = Project(name=f"Test Project {str(uuid.uuid4())}")
         project2 = Project(name=f"Test Project {str(uuid.uuid4())}")
         db.add_all([project1, project2])
@@ -155,7 +208,7 @@ class TestModelConstraints:
             pytest.fail("Entity name should be unique per project")
 
     def test_join_key__unique_name_per_entity(self, db: Session) -> None:
-        """Test the creation and saving of a join key with a unique key"""
+        """Test the creation of a join key with a unique key"""
         entity = Entity(name=f"Test Entity {str(uuid.uuid4())}")
         db.add(entity)
         db.commit()
@@ -169,7 +222,7 @@ class TestModelConstraints:
             db.commit()
 
     def test_target__unique_name_per_project(self, db: Session) -> None:
-        """Test the creation and saving of a target with a unique name"""
+        """Test the creation of a target with a unique name"""
         project = Project(name=f"Test Project {str(uuid.uuid4())}")
         db.add(project)
         db.commit()
@@ -190,7 +243,7 @@ class TestModelConstraints:
             db.commit()
 
     def test_target__not_unique_name_between_projects(self, db: Session) -> None:
-        """Test the creation and saving of a target with a unique name"""
+        """Test the creation of a target with a unique name"""
         project1 = Project(name=f"Test Project {str(uuid.uuid4())}")
         project2 = Project(name=f"Test Project {str(uuid.uuid4())}")
         db.add_all([project1, project2])
@@ -213,6 +266,55 @@ class TestModelConstraints:
             db.commit()
         except IntegrityError:
             pytest.fail("Target name should be unique per project")
+
+    def test_target_value__unique_per_timestamp(self, db: Session) -> None:
+        """Test the creation of a target value with a unique timestamp"""
+        target = Target(name="Test Target", data_type=DataType.FLOAT)
+        db.add(target)
+        db.flush()
+        target_value1 = TargetValue(
+            value={"float": 1.0},
+            target=target,
+            timestamp=datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC),
+        )
+        db.add(target_value1)
+        db.flush()
+        target_value2 = TargetValue(
+            value={"float": 10.0},
+            target=target,
+            timestamp=datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC),
+        )
+        with pytest.raises(IntegrityError):
+            db.add(target_value2)
+            db.commit()
+
+    def test_target_value__unique_per_timestamp__store_multiple_values(
+        self, db: Session
+    ) -> None:
+        """Test the creation of multiples target values for the same target"""
+        target = Target(name="Test Target", data_type=DataType.FLOAT)
+        db.add(target)
+        db.flush()
+        target_value1 = TargetValue(
+            value={"float": 1.0},
+            target=target,
+            timestamp=datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC),
+        )
+        db.add(target_value1)
+        db.flush()
+        target_value2 = TargetValue(
+            value={"float": 10.0},
+            target=target,
+            timestamp=datetime(2025, 1, 1, 12, 0, 1, tzinfo=UTC),
+        )
+        db.add(target_value2)
+
+        try:
+            db.commit()
+        except IntegrityError:
+            pytest.fail("Target value should be unique per timestamp")
+
+        assert len(db.query(TargetValue).all()) == 2
 
 
 @pytest.mark.usefixtures("cleanup")

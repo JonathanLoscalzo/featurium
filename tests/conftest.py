@@ -8,10 +8,10 @@ from featurium.core.models import Base
 
 
 @pytest.fixture()
-def db() -> Generator[pytest.Session, None, None]:
+def db() -> Generator[Session, None, None]:
     """Create the session"""
-    engine = create_engine("sqlite:///featurium.db")
-    # engine = create_engine("sqlite:///:memory:")
+    # engine = create_engine("sqlite:///featurium.db")
+    engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(bind=engine) as session:
         yield session

@@ -45,8 +45,14 @@ class TestCreateModels:
 
     def test_join_key_model(self) -> None:
         """Test the creation and saving of a join key"""
-        join_key = JoinKey(key="Test Join Key")
-        assert join_key.key == "Test Join Key"
+        join_key = JoinKey(
+            name="test:join",
+            description="Test Join Key",
+            meta={"tag": "value"},
+        )
+        assert join_key.name == "test:join"
+        assert join_key.description == "Test Join Key"
+        assert join_key.meta == {"tag": "value"}
 
     def test_join_key_value_model(self) -> None:
         """Test the creation and saving of a join key value"""
@@ -213,10 +219,10 @@ class TestModelConstraints:
         db.add(entity)
         db.commit()
         join_key_name = f"Test Join Key {str(uuid.uuid4())}"
-        join_key1 = JoinKey(key=join_key_name, entity=entity)
+        join_key1 = JoinKey(name=join_key_name, entity=entity)
         db.add(join_key1)
         db.commit()
-        join_key2 = JoinKey(key=join_key_name, entity=entity)
+        join_key2 = JoinKey(name=join_key_name, entity=entity)
         with pytest.raises(IntegrityError):
             db.add(join_key2)
             db.commit()
@@ -347,10 +353,9 @@ class TestTaxiProject:
 
             # 3. Crear la join key para la entidad Trip
             trip_id_key = JoinKey(
-                name="trip_id",
-                key="trip_id",
+                name="trip:id",
+                description="Identificador único del viaje",
                 entity=trip_entity,
-                data_type=DataType.STRING,
                 created_by="system",
                 updated_by="system",
             )
@@ -449,8 +454,8 @@ class TestTaxiProject:
                 session.flush()
 
                 # Asociar los valores de los features con el valor de la join key
-                distance_value.join_key_values.append(trip_id_value)
-                duration_value.join_key_values.append(trip_id_value)
+                distance_value.join_key_value = trip_id_value
+                duration_value.join_key_value = trip_id_value
                 session.flush()
 
                 # Crear target value
@@ -465,7 +470,7 @@ class TestTaxiProject:
                 session.add(target_value)
                 session.flush()
 
-                target_value.join_key_values.append(trip_id_value)
+                target_value.join_key_value_id = trip_id_value.id
                 session.flush()
 
             # Commit todos los cambios
@@ -499,5 +504,5 @@ class TestTaxiProject:
         assert trip.name == "trip"
         assert trip.description == "Representa un viaje en taxi"
         assert len(trip.features) == 2
-        assert len(trip.join_keys) == 1
-        assert trip.join_keys[0].key == "trip_id"
+        assert trip.join_key is not None
+        assert trip.join_key.name == "trip:id"

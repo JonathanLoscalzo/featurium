@@ -11,7 +11,7 @@ from typing import Any, List, Optional
 
 from sqlalchemy import JSON, DateTime
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy import ForeignKey, String, UniqueConstraint
+from sqlalchemy import ForeignKey, Sequence, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 
 Base = declarative_base()
@@ -31,7 +31,10 @@ class DataType(str, Enum):
 class IdentifiableMixin:
     """Mixin for all models with common fields"""
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        Sequence("Seq_id"),
+        primary_key=True,
+    )
 
 
 class NamedMixin:
@@ -173,11 +176,14 @@ class FeatureValue(BaseValueModel):
 
     # Foreign keys
     feature_id: Mapped[int] = mapped_column(ForeignKey("features.id"))
+    join_key_value_id: Mapped[int] = mapped_column(
+        ForeignKey("join_key_values.id"), nullable=True
+    )
 
     # Relationships
     feature: Mapped["Feature"] = relationship(back_populates="feature_values")
-    join_key_values: Mapped[List["JoinKeyValue"]] = relationship(
-        back_populates="feature_values", secondary="feature_join_key_values"
+    join_key_value: Mapped["JoinKeyValue"] = relationship(
+        back_populates="feature_values",
     )
 
     def __repr__(self) -> str:
@@ -210,7 +216,7 @@ class Entity(BaseModel):
 
     # Relationships
     project: Mapped[Optional["Project"]] = relationship(back_populates="entities")
-    join_keys: Mapped[List["JoinKey"]] = relationship(back_populates="entity")
+    join_key: Mapped["JoinKey"] = relationship(back_populates="entity")
     features: Mapped[List["Feature"]] = relationship(
         back_populates="entities",
         secondary="feature_entities",
@@ -230,19 +236,14 @@ class JoinKey(BaseModel):
 
     __tablename__ = "join_keys"
     __table_args__ = (
-        UniqueConstraint("entity_id", "key", name="ux_join_keys_entity_id_key"),
-    )
-    # Columns
-    key: Mapped[str] = mapped_column(String(255))
-    data_type: Mapped[DataType] = mapped_column(
-        SQLEnum(DataType), default=DataType.STRING
+        UniqueConstraint("entity_id", "name", name="ux_join_keys_entity_id_name"),
     )
 
     # Foreign keys
     entity_id: Mapped[int] = mapped_column(ForeignKey("entities.id"))
 
     # Relationships
-    entity: Mapped["Entity"] = relationship(back_populates="join_keys")
+    entity: Mapped["Entity"] = relationship(back_populates="join_key")
     join_key_values: Mapped[List["JoinKeyValue"]] = relationship(
         back_populates="join_key",
     )
@@ -274,16 +275,16 @@ class JoinKeyValue(BaseValueModel):
     __tablename__ = "join_key_values"
 
     # Foreign keys
-    value: Mapped[dict] = mapped_column(JSON)
+    value: Mapped[dict] = mapped_column(JSON)  # TODO: it could be blob, or jsonb
     join_key_id: Mapped[int] = mapped_column(ForeignKey("join_keys.id"))
 
     # Relationships
     join_key: Mapped["JoinKey"] = relationship(back_populates="join_key_values")
     feature_values: Mapped[List["FeatureValue"]] = relationship(
-        back_populates="join_key_values", secondary="feature_join_key_values"
+        back_populates="join_key_value"
     )
     target_values: Mapped[List["TargetValue"]] = relationship(
-        back_populates="join_key_values", secondary="target_join_key_values"
+        back_populates="join_key_value"
     )
 
     def __repr__(self) -> str:
@@ -292,28 +293,6 @@ class JoinKeyValue(BaseValueModel):
             f"JoinKeyValue(id={self.id}, key='{self.join_key.key}', "
             f"value={self.value_scalar})"
         )
-
-    @property
-    def value_scalar(self) -> Any:
-        """Get the scalar value from the JSON value based on data_type."""
-        if not self.value or self.join_key.data_type.value not in self.value:
-            return None
-
-        return self.value[self.join_key.data_type.value]
-
-
-class FeatureJoinKeyValue(Association):
-    """FeatureJoinKeyValue model storing actual values for join keys"""
-
-    __tablename__ = "feature_join_key_values"
-
-    # Foreign keys
-    feature_value_id: Mapped[int] = mapped_column(
-        ForeignKey("feature_values.id"), primary_key=True
-    )
-    join_key_value_id: Mapped[int] = mapped_column(
-        ForeignKey("join_key_values.id"), primary_key=True
-    )
 
 
 class Target(BaseModel):
@@ -338,12 +317,12 @@ class Target(BaseModel):
         back_populates="targets",
         secondary="target_entities",
     )
-    join_keys: Mapped[List["JoinKey"]] = relationship(
-        secondary="target_entities",
-        primaryjoin="Target.id == TargetEntities.target_id",
-        secondaryjoin="Entity.id == JoinKey.entity_id",
-        viewonly=True,
-    )
+    # join_keys: Mapped[List["JoinKey"]] = relationship(
+    #     secondary="target_entities",
+    #     primaryjoin="Target.id == TargetEntities.target_id",
+    #     secondaryjoin="Entity.id == JoinKey.entity_id",
+    #     viewonly=True,
+    # )
 
     def __repr__(self) -> str:
         """String representation of the Target model"""
@@ -370,12 +349,14 @@ class TargetValue(BaseValueModel):
 
     # Foreign keys
     target_id: Mapped[int] = mapped_column(ForeignKey("targets.id"))
+    join_key_value_id: Mapped[int] = mapped_column(
+        ForeignKey("join_key_values.id"), nullable=True
+    )
 
     # Relationships
     target: Mapped["Target"] = relationship(back_populates="target_values")
-    join_key_values: Mapped[List["JoinKeyValue"]] = relationship(
+    join_key_value: Mapped["JoinKeyValue"] = relationship(
         back_populates="target_values",
-        secondary="target_join_key_values",
     )
 
     def __repr__(self) -> str:
@@ -402,17 +383,3 @@ class TargetEntities(Association):
     # Foreign keys
     target_id: Mapped[int] = mapped_column(ForeignKey("targets.id"), primary_key=True)
     entity_id: Mapped[int] = mapped_column(ForeignKey("entities.id"), primary_key=True)
-
-
-class TargetJoinKeyValues(Association):
-    """Association table between Target and JoinKeyValue."""
-
-    __tablename__ = "target_join_key_values"
-
-    # Foreign keys
-    target_value_id: Mapped[int] = mapped_column(
-        ForeignKey("target_values.id"), primary_key=True
-    )
-    join_key_value_id: Mapped[int] = mapped_column(
-        ForeignKey("join_key_values.id"), primary_key=True
-    )

@@ -48,7 +48,7 @@ line_length = 88
 
 [tool.flake8]
 max-line-length = 88
-extend-ignore = ["E203", "D205"]
+extend-ignore = ["E203", "D205", "D107", "D202"]
 max-complexity = 10
 exclude = [".git", "__pycache__", "build", "dist", "*.egg-info"]
 docstring-style = "google"

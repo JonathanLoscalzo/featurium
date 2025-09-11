@@ -7,14 +7,22 @@ This module defines the SQLAlchemy models for the Feature Store.
 
 from datetime import UTC, datetime
 from enum import Enum
+from textwrap import dedent
 from typing import Any, List, Optional
 
-from sqlalchemy import JSON, DateTime
+from sqlalchemy import JSON, Boolean, DateTime
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy import ForeignKey, Sequence, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 
 Base = declarative_base()
+
+
+class AttributeType(str, Enum):
+    """Enum for attribute types"""
+
+    FEATURE = "feature"
+    TARGET = "target"
 
 
 class DataType(str, Enum):
@@ -109,25 +117,34 @@ class Project(BaseModel):
     __table_args__ = (UniqueConstraint("name", name="ux_projects_name"),)
 
     # Relationships
-    features: Mapped[List["Feature"]] = relationship(back_populates="project")
     entities: Mapped[List["Entity"]] = relationship(back_populates="project")
-    targets: Mapped[List["Target"]] = relationship(back_populates="project")
+    attributes: Mapped[List["Attribute"]] = relationship(back_populates="project")
+
+    # ViewOnly Relationships
+    features: Mapped[List["Attribute"]] = relationship(
+        "Attribute",
+        primaryjoin="and_(Project.id==Attribute.project_id, Attribute.type=='FEATURE')",
+        viewonly=True,
+    )
+    targets: Mapped[List["Attribute"]] = relationship(
+        "Attribute",
+        primaryjoin="and_(Project.id==Attribute.project_id, Attribute.type=='TARGET')",
+        viewonly=True,
+    )
 
     def __repr__(self) -> str:
         """String representation of the Project model"""
         return f"Project(id={self.id}, name='{self.name}')"
 
 
-class Feature(BaseModel):
-    """Feature model representing a measurable attribute"""
+class Attribute(BaseModel):
+    """Attribute model representing a measurable attribute"""
 
-    __tablename__ = "features"
-    __table_args__ = (
-        UniqueConstraint("project_id", "name", name="ux_features_project_id_name"),
+    __tablename__ = "attributes"
+
+    type: Mapped[AttributeType] = mapped_column(
+        SQLEnum(AttributeType), default=AttributeType.FEATURE
     )
-
-    # Columns
-    data_type: Mapped[DataType] = mapped_column(SQLEnum(DataType))
 
     # Foreign keys
     project_id: Mapped[Optional[int]] = mapped_column(
@@ -135,71 +152,74 @@ class Feature(BaseModel):
     )
 
     # Relationships
-    project: Mapped[Optional["Project"]] = relationship(back_populates="features")
+    project: Mapped[Optional["Project"]] = relationship(back_populates="attributes")
     entities: Mapped[List["Entity"]] = relationship(
-        back_populates="features",
-        secondary="feature_entities",
+        back_populates="attributes",
+        secondary="attribute_entities",
     )
-    feature_values: Mapped[List["FeatureValue"]] = relationship(
-        back_populates="feature"
+    attribute_values: Mapped[List["AttributeValue"]] = relationship(
+        back_populates="attribute",
     )
-    join_keys: Mapped[List["JoinKey"]] = relationship(
-        secondary="feature_entities",
-        primaryjoin="Feature.id == FeatureEntities.feature_id",
-        # secondaryjoin="Entity.id == JoinKey.entity_id",
-        secondaryjoin="FeatureEntities.entity_id == JoinKey.entity_id",
-        viewonly=True,
+
+    # Columns
+    data_type: Mapped[DataType] = mapped_column(SQLEnum(DataType))
+    is_label: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="ux_attributes_project_id_name"),
     )
 
     def __repr__(self) -> str:
-        """String representation of the Feature model"""
-        return f"Feature(id={self.id}, name='{self.name}', type={self.data_type})"
+        """String representation of the Attribute model"""
+        return f"Attribute(id={self.id}, name='{self.name}', type='{self.type}')"
 
 
-class FeatureValue(BaseValueModel):
-    """FeatureValue model storing actual values for features"""
+class AttributeValue(BaseValueModel):
+    """AttributeValue model storing actual values for attributes"""
 
-    __tablename__ = "feature_values"
-    __table_args__ = (
-        UniqueConstraint(
-            "feature_id",
-            "timestamp",
-            name="ux_feature_values_feature_id_timestamp",
-        ),
-    )
+    __tablename__ = "attribute_values"
+
     # Columns
     value: Mapped[dict] = mapped_column(JSON)
-
     timestamp: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC)
     )
 
     # Foreign keys
-    feature_id: Mapped[int] = mapped_column(ForeignKey("features.id"))
+    attribute_id: Mapped[int] = mapped_column(ForeignKey("attributes.id"))
     join_key_value_id: Mapped[int] = mapped_column(
         ForeignKey("join_key_values.id"), nullable=True
     )
 
     # Relationships
-    feature: Mapped["Feature"] = relationship(back_populates="feature_values")
+    attribute: Mapped["Attribute"] = relationship(back_populates="attribute_values")
     join_key_value: Mapped["JoinKeyValue"] = relationship(
-        back_populates="feature_values",
+        back_populates="attribute_values",
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "join_key_value_id",
+            "attribute_id",
+            "timestamp",
+            name="ux_attribute_values_join_key_value_id_attribute_id_timestamp",
+        ),
     )
 
     def __repr__(self) -> str:
-        """String representation of the FeatureValue model"""
+        """String representation of the AttributeValue model"""
         return (
-            f"FeatureValue(id={self.id}, feature='{self.feature.name}', "
+            f"AttributeValue(id={self.id}, attribute='{self.attribute.name}', "
             f"value={self.value_scalar})"
         )
 
     @property
     def value_scalar(self) -> Any:
         """Get the scalar value from the JSON value based on data_type."""
-        if not self.value or self.feature.data_type.value not in self.value:
+        if not self.value or self.attribute.data_type.value not in self.value:
             return None
 
-        return self.value[self.feature.data_type.value]
+        return self.value[self.attribute.data_type.value]
 
 
 class Entity(BaseModel):
@@ -217,13 +237,26 @@ class Entity(BaseModel):
     # Relationships
     project: Mapped[Optional["Project"]] = relationship(back_populates="entities")
     join_key: Mapped["JoinKey"] = relationship(back_populates="entity")
-    features: Mapped[List["Feature"]] = relationship(
+    attributes: Mapped[List["Attribute"]] = relationship(
         back_populates="entities",
-        secondary="feature_entities",
+        secondary="attribute_entities",
     )
-    targets: Mapped[List["Target"]] = relationship(
-        back_populates="entities",
-        secondary="target_entities",
+
+    # ViewOnly Relationships
+    features: Mapped[List["Attribute"]] = relationship(
+        "Attribute",
+        secondary="attribute_entities",
+        primaryjoin="Entity.id==AttributeEntities.entity_id",
+        secondaryjoin="and_(Attribute.id==AttributeEntities.attribute_id, Attribute.type=='FEATURE')",  # noqa: E501
+        viewonly=True,
+    )
+
+    targets: Mapped[List["Attribute"]] = relationship(
+        "Attribute",
+        secondary="attribute_entities",
+        primaryjoin="Entity.id==AttributeEntities.entity_id",
+        secondaryjoin="and_(Attribute.id==AttributeEntities.attribute_id, Attribute.type=='TARGET')",  # noqa: E501
+        viewonly=True,
     )
 
     def __repr__(self) -> str:
@@ -250,22 +283,25 @@ class JoinKey(BaseModel):
 
     def __repr__(self) -> str:
         """String representation of the JoinKey model"""
-        return f"JoinKey(id={self.id}, key='{self.key}')"
+        return f"JoinKey(id={self.id}, entity_id={self.entity_id})"
 
 
-class FeatureEntities(Association):
-    """Association table between Feature and Entity."""
+class AttributeEntities(Association):
+    """Association table between Attribute and Entity."""
 
-    __tablename__ = "feature_entities"
+    __tablename__ = "attribute_entities"
 
     # Foreign keys
-    feature_id: Mapped[int] = mapped_column(ForeignKey("features.id"), primary_key=True)
+    attribute_id: Mapped[int] = mapped_column(
+        ForeignKey("attributes.id"), primary_key=True
+    )
     entity_id: Mapped[int] = mapped_column(ForeignKey("entities.id"), primary_key=True)
 
     def __repr__(self) -> str:
-        """String representation of the FeatureEntities model"""
+        """String representation of the AttributeEntities model"""
         return (
-            f"FeatureEntities(feature_id={self.feature_id}, entity_id={self.entity_id})"
+            f"AttributeEntities(attribute_id={self.attribute_id}, "
+            f"entity_id={self.entity_id})"
         )
 
 
@@ -275,111 +311,45 @@ class JoinKeyValue(BaseValueModel):
     __tablename__ = "join_key_values"
 
     # Foreign keys
-    value: Mapped[dict] = mapped_column(JSON)  # TODO: it could be blob, or jsonb
     join_key_id: Mapped[int] = mapped_column(ForeignKey("join_keys.id"))
 
     # Relationships
     join_key: Mapped["JoinKey"] = relationship(back_populates="join_key_values")
-    feature_values: Mapped[List["FeatureValue"]] = relationship(
-        back_populates="join_key_value"
+
+    # Columns
+    value: Mapped[dict] = mapped_column(JSON)
+
+    # Relación unificada
+    attribute_values: Mapped[List["AttributeValue"]] = relationship(
+        back_populates="join_key_value",
     )
-    target_values: Mapped[List["TargetValue"]] = relationship(
-        back_populates="join_key_value"
+
+    feature_values: Mapped[List["AttributeValue"]] = relationship(
+        back_populates="join_key_value",
+        primaryjoin=dedent(
+            """and_(
+            JoinKeyValue.id==AttributeValue.join_key_value_id,
+            AttributeValue.attribute_id==Attribute.id,
+            Attribute.type=='feature'
+        )
+        """
+        ),
+        viewonly=True,
+    )
+
+    target_values: Mapped[List["AttributeValue"]] = relationship(
+        back_populates="join_key_value",
+        primaryjoin=dedent(
+            """and_(
+                JoinKeyValue.id==AttributeValue.join_key_value_id,
+                AttributeValue.attribute_id==Attribute.id,
+                Attribute.type=='target'
+            )
+        """
+        ),
+        viewonly=True,
     )
 
     def __repr__(self) -> str:
         """String representation of the JoinKeyValue model"""
-        return (
-            f"JoinKeyValue(id={self.id}, key='{self.join_key.key}', "
-            f"value={self.value_scalar})"
-        )
-
-
-class Target(BaseModel):
-    """Target model for tracking target variables"""
-
-    __tablename__ = "targets"
-    __table_args__ = (
-        UniqueConstraint("project_id", "name", name="ux_targets_project_id_name"),
-    )
-    # Columns
-    data_type: Mapped[DataType] = mapped_column(SQLEnum(DataType))
-
-    # Foreign keys
-    project_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("projects.id"), nullable=True
-    )
-
-    # Relationships
-    project: Mapped[Optional["Project"]] = relationship(back_populates="targets")
-    target_values: Mapped[List["TargetValue"]] = relationship(back_populates="target")
-    entities: Mapped[List["Entity"]] = relationship(
-        back_populates="targets",
-        secondary="target_entities",
-    )
-    # join_keys: Mapped[List["JoinKey"]] = relationship(
-    #     secondary="target_entities",
-    #     primaryjoin="Target.id == TargetEntities.target_id",
-    #     secondaryjoin="Entity.id == JoinKey.entity_id",
-    #     viewonly=True,
-    # )
-
-    def __repr__(self) -> str:
-        """String representation of the Target model"""
-        return f"Target(id={self.id}, name='{self.name}')"
-
-
-class TargetValue(BaseValueModel):
-    """TargetValue model storing actual values for targets"""
-
-    __tablename__ = "target_values"
-    __table_args__ = (
-        UniqueConstraint(
-            "target_id",
-            "timestamp",
-            name="ux_target_values_target_id_timestamp",
-        ),
-    )
-
-    # Columns
-    value: Mapped[dict] = mapped_column(JSON)
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
-
-    # Foreign keys
-    target_id: Mapped[int] = mapped_column(ForeignKey("targets.id"))
-    join_key_value_id: Mapped[int] = mapped_column(
-        ForeignKey("join_key_values.id"), nullable=True
-    )
-
-    # Relationships
-    target: Mapped["Target"] = relationship(back_populates="target_values")
-    join_key_value: Mapped["JoinKeyValue"] = relationship(
-        back_populates="target_values",
-    )
-
-    def __repr__(self) -> str:
-        """String representation of the TargetValue model"""
-        return (
-            f"TargetValue(id={self.id}, target='{self.target.name}', "
-            f"value={self.value_scalar})"
-        )
-
-    @property
-    def value_scalar(self) -> Any:
-        """Get the scalar value from the JSON value based on data_type."""
-        if not self.value or self.target.data_type.value not in self.value:
-            return None
-
-        return self.value[self.target.data_type.value]
-
-
-class TargetEntities(Association):
-    """Association table between Target and Entity."""
-
-    __tablename__ = "target_entities"
-
-    # Foreign keys
-    target_id: Mapped[int] = mapped_column(ForeignKey("targets.id"), primary_key=True)
-    entity_id: Mapped[int] = mapped_column(ForeignKey("entities.id"), primary_key=True)
+        return f"JoinKeyValue(id={self.id}, " f"value={self.value})"

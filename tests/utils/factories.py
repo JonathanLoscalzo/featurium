@@ -4,10 +4,11 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from featurium.core.models import (
+    Attribute,
+    AttributeType,
+    AttributeValue,
     DataType,
     Entity,
-    Feature,
-    FeatureValue,
     JoinKey,
     JoinKeyValue,
     Project,
@@ -24,9 +25,9 @@ def create_project(db: Session, name: str) -> Project:
 
 def create_feature(
     db: Session, name: str, project: Project, data_type: DataType
-) -> Feature:
+) -> Attribute:
     """Create a feature"""
-    feature = Feature(name=name, project=project, data_type=data_type)
+    feature = Attribute(name=name, project=project, data_type=data_type, is_label=False)
     db.add(feature)
     db.flush()
     return feature
@@ -57,10 +58,38 @@ def create_join_key_value(db: Session, join_key: JoinKey, value: Any) -> JoinKey
 
 
 def create_feature_value(
-    db: Session, feature: Feature, value: Any, timestamp: datetime
-) -> FeatureValue:
+    db: Session, attribute: Attribute, value: Any, timestamp: datetime
+) -> AttributeValue:
     """Create a feature value"""
-    feature_value = FeatureValue(feature=feature, value=value, timestamp=timestamp)
-    db.add(feature_value)
+    attribute_value = AttributeValue(
+        attribute=attribute, value=value, timestamp=timestamp
+    )
+    db.add(attribute_value)
     db.flush()
-    return feature_value
+    return attribute_value
+
+
+def create_target(
+    db: Session, name: str, project: Project, data_type: DataType
+) -> Attribute:
+    """Create a target"""
+    target = Attribute(
+        name=name,
+        project=project,
+        data_type=data_type,
+        is_label=True,
+        type=AttributeType.TARGET,
+    )
+    db.add(target)
+    db.flush()
+    return target
+
+
+def create_target_value(
+    db: Session, target: Attribute, value: Any, timestamp: datetime
+) -> AttributeValue:
+    """Create a target value"""
+    target_value = AttributeValue(attribute=target, value=value, timestamp=timestamp)
+    db.add(target_value)
+    db.flush()
+    return target_value

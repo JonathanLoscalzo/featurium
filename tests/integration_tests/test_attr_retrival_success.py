@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from featurium.core.models import DataType
-from featurium.services.feature_retrieval import FeatureRetrieval
+from featurium.services.feature_retrieval import RetrivalStore
 from tests.integration_tests.utils import BaseTestCase, TestCase
 from tests.utils.factories import (
     create_entity,
@@ -228,7 +228,7 @@ class TestFeatureRetrievalSuccess(BaseTestCase):
     def test_feature_retrieval(self, db: Session, test_case: TestCase):
         """Test the feature retrieval"""
 
-        feature_retrieval = FeatureRetrieval(db)
+        feature_retrieval = RetrivalStore(db)
 
         result = feature_retrieval.get_feature_values(
             project_name=test_case.project_name,
@@ -296,7 +296,7 @@ class TestTargetRetrievalSuccess(BaseTestCase):
     def test_target_retrieval(self, db: Session, test_case: TestCase):
         """Test the target retrieval"""
 
-        feature_retrieval = FeatureRetrieval(db)
+        feature_retrieval = RetrivalStore(db)
 
         result = feature_retrieval.get_target_values(
             project_name=test_case.project_name,

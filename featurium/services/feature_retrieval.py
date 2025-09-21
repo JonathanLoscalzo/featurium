@@ -18,7 +18,7 @@ from featurium.core.models import (
     JoinKeyValue,
     Project,
 )
-from featurium.services.retrieval import RetrievalService
+from featurium.services.base_retrieval import RetrievalService
 
 
 class FeatureRetrievalProtocol(Protocol):
@@ -57,7 +57,7 @@ class FeatureRetrievalProtocol(Protocol):
         ...
 
 
-class FeatureRetrieval(RetrievalService):
+class RetrivalStore(RetrievalService):
     def __init__(self, db: Session):
         """
         Initialize the FeatureRetrieval Service.
@@ -482,7 +482,7 @@ class FeatureRetrieval(RetrievalService):
         return pivot
 
 
-class FeatureRetrievalDuckDB(RetrievalService):
+class RetrivalDuckDBStore(RetrievalService):
     """
     FeatureRetrieval Service that uses DuckDB as a backend.
     """
@@ -652,6 +652,7 @@ class FeatureRetrievalDuckDB(RetrievalService):
             "postgresql": "postgres",
             "postgresql+psycopg2": "postgres",
             "sqlite": "sqlite",
+            "duckdb": "duckdb",
         }
 
         # Normalizar a string
@@ -667,6 +668,13 @@ class FeatureRetrievalDuckDB(RetrievalService):
             raise ValueError(f"Driver no soportado: {url.drivername}")
 
         db_type = driver_map[url.drivername]
+
+        if db_type == "duckdb":
+            print(str(url))
+            print(sqlalchemy_url)
+            db_path = str(url).replace("duckdb:///", "")
+            conn = duckdb.connect(db_path, read_only=True)
+            return conn
 
         # Conexión DuckDB en memoria
         conn = duckdb.connect(":memory:")

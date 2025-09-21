@@ -23,7 +23,7 @@ from sqlalchemy import Engine, make_url
 from sqlalchemy.orm import Session
 
 from featurium.core.models import AttributeType
-from featurium.services.base_retrieval import RetrievalService
+from featurium.services.retrival.base_retrieval import RetrievalService
 
 try:
     import ibis

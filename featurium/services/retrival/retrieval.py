@@ -18,7 +18,7 @@ from featurium.core.models import (
     JoinKeyValue,
     Project,
 )
-from featurium.services.base_retrieval import RetrievalService
+from featurium.services.retrival.base_retrieval import RetrievalService
 
 
 class FeatureRetrievalProtocol(Protocol):

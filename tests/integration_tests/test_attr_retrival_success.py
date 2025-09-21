@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from featurium.core.models import DataType
-from featurium.services.retrieval import RetrivalStore
+from featurium.services.retrival.retrieval import RetrivalStore
 from tests.integration_tests.utils import BaseTestCase, TestCase
 from tests.utils.factories import (
     create_entity,

@@ -17,7 +17,7 @@
     "[toml]": {
         "editor.defaultFormatter": "tamasfe.even-better-toml"
     },
-    "python.pythonPath": ".venv/bin/python",
+    "python.pythonPath": "/Users/jloscalzo/Projects/tesina/feature-store-tesina/.venv/bin/python",
     "[sql]": {
         "editor.defaultFormatter": "inferrinizzard.prettier-sql-vscode"
     }

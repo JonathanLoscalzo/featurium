@@ -13,9 +13,14 @@ from typing import Any, List, Optional
 from sqlalchemy import JSON, Boolean, DateTime
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy import ForeignKey, Sequence, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    """Base model class"""
+
+    __abstract__ = True
+    pass
 
 
 class AttributeType(str, Enum):

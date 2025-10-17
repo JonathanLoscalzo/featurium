@@ -433,6 +433,9 @@ class RetrievalStore(RetrievalService):
 
         df["value"] = df["value"].apply(self._extract_single_value)
         df["join_key_value"] = df["join_key_value"].apply(self._extract_single_value)
+        # TODO: This is a hack to convert to string to match all_combinations
+        # But, check if it works for other cases!
+        df["join_key_value"] = df["join_key_value"].astype(str)
 
         # 1. Get list of tuples (entity_name, join_key, join_key_value)
         key_tuples = [

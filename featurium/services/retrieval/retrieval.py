@@ -18,7 +18,7 @@ from featurium.core.models import (
     JoinKeyValue,
     Project,
 )
-from featurium.services.retrival.base_retrieval import RetrievalService
+from featurium.services.retrieval.base_retrieval import RetrievalService
 
 
 class FeatureRetrievalProtocol(Protocol):
@@ -57,7 +57,7 @@ class FeatureRetrievalProtocol(Protocol):
         ...
 
 
-class RetrivalStore(RetrievalService):
+class RetrievalStore(RetrievalService):
     def __init__(self, db: Session):
         """
         Initialize the FeatureRetrieval Service.
@@ -482,7 +482,7 @@ class RetrivalStore(RetrievalService):
         return pivot
 
 
-class RetrivalDuckDBStore(RetrievalService):
+class RetrievalDuckDBStore(RetrievalService):
     """
     FeatureRetrieval Service that uses DuckDB as a backend.
     """

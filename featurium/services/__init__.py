@@ -1,3 +1,3 @@
-from .retrival.retrieval import RetrivalDuckDBStore, RetrivalStore
+from .retrieval.retrieval import RetrievalDuckDBStore, RetrievalStore
 
-__all__ = ["RetrivalStore", "RetrivalDuckDBStore"]
+__all__ = ["RetrievalStore", "RetrievalDuckDBStore"]

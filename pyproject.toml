@@ -28,13 +28,14 @@ flake8 = "^7.2.0"
 pytest-cov = "^6.1.1"
 ipykernel = "^6.29.5"
 jupysql = "^0.11.1"
+pytest-mock = "^3.15.1"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.black]
-line-length = 88
+line-length = 110
 target-version = ['py38']
 include = '\.pyi?$'
 
@@ -44,10 +45,10 @@ multi_line_output = 3
 include_trailing_comma = true
 force_grid_wrap = 0
 use_parentheses = true
-line_length = 88
+line_length = 110
 
 [tool.flake8]
-max-line-length = 88
+max-line-length = 110
 extend-ignore = ["E203", "D205", "D107", "D202", "W503"]
 max-complexity = 10
 exclude = [".git", "__pycache__", "build", "dist", "*.egg-info"]

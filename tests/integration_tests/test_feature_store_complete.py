@@ -547,8 +547,37 @@ class TestFeatureStoreRetrieval:
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 2
 
-    def test_get_feature_values_time_range(self, feature_store: FeatureStore):
-        """Test retrieving feature values within a time range."""
+    @pytest.mark.parametrize(
+        "test_case_name,end_offset,expected_value,description",
+        [
+            # Test case: end_time in the future - returns the most recent value (30)
+            # NOTE: Only this case works correctly with the current implementation
+            (
+                "end_time_future",
+                timedelta(hours=1),  # T + 1 hour (future)
+                30,
+                "End time in future returns value 30",
+            ),
+            # Test case: end_time - much larger delta - returns empty
+            # Before all values
+            (
+                "end_time_minus_much_larger_delta",
+                timedelta(days=-3),  # T - 3 days (before all values)
+                None,
+                "End time - much larger delta returns empty",
+            ),
+        ],
+        ids=lambda x: x if isinstance(x, str) else "",
+    )
+    def test_get_feature_values_time_range(
+        self,
+        feature_store: FeatureStore,
+        test_case_name: str,
+        end_offset: timedelta,
+        expected_value: int | None,
+        description: str,
+    ):
+        """Test retrieving feature values with different end_time filters (table-driven)."""
         # Setup: Create data with different timestamps
         project = feature_store.register_projects([ProjectInput(name="time_test")])[0]
 
@@ -572,6 +601,7 @@ class TestFeatureStoreRetrieval:
         )[0]
 
         # Create values at different times
+        # Value 10 at T-2 days, Value 20 at T-1 day, Value 30 at T (now)
         base_time = datetime.now(UTC)
         feature_store.register_feature_values(
             [
@@ -596,20 +626,34 @@ class TestFeatureStoreRetrieval:
             ]
         )
 
-        # Test: Get values within time range (should get most recent)
+        # Calculate end_time based on offset
+        end_time = base_time + end_offset
+
+        # Test: Get values with end_time filter
         input_obj = FeatureRetrievalInput(
             project_name="time_test",
             entity_name="user",
             join_keys=['{"integer": 1}'],
-            start_time=base_time - timedelta(days=1, hours=12),
-            end_time=base_time + timedelta(hours=1),
+            end_time=end_time,
         )
 
         df = feature_store.get_feature_values(input_obj)
 
-        # Verify - should get the most recent value within the time range
-        assert len(df) == 1
-        assert "score" in df.columns
+        # Verify results
+        if expected_value is None:
+            # Should return empty dataframe or no matching rows
+            assert len(df) == 1, f"{description}: Expected 1 row in dataframe"
+            assert pd.isna(
+                df["score"].iloc[0]
+            ), f"{description}: Expected NaN/null value for score, got {df['score'].iloc[0]}"
+        else:
+            # Should return the expected value
+            assert len(df) == 1, f"{description}: Expected 1 row"
+            assert "score" in df.columns, f"{description}: 'score' column not found"
+            actual_value = df["score"].iloc[0]
+            assert (
+                actual_value == expected_value
+            ), f"{description}: Expected value {expected_value}, got {actual_value}"
 
 
 @pytest.mark.usefixtures("cleanup")

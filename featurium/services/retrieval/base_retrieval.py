@@ -1,3 +1,4 @@
+import json
 from typing import Any, Counter, List
 
 from sqlalchemy import CHAR, TEXT, cast, select
@@ -41,14 +42,10 @@ class RetrievalService:
             entity_name: The name of the entity.
         """
         entity = self.db.scalar(
-            select(Entity).where(
-                Entity.name == entity_name, Entity.project_id == project.id
-            )
+            select(Entity).where(Entity.name == entity_name, Entity.project_id == project.id)
         )
         if not entity:
-            raise ValueError(
-                f"Entity '{entity_name}' not found in project '{project.name}'"
-            )
+            raise ValueError(f"Entity '{entity_name}' not found in project '{project.name}'")
         return entity
 
     def _extract_single_value(self, d: Any) -> Any:
@@ -59,9 +56,7 @@ class RetrievalService:
             return next(iter(d.values()))
         return d  # optional: pass if not a dict
 
-    def _get_join_key_values(
-        self, entity: Entity, join_keys: List[Any]
-    ) -> List[JoinKeyValue]:
+    def _get_join_key_values(self, entity: Entity, join_keys: List[Any]) -> List[JoinKeyValue]:  # noqa: C901
         """
         Get the join key values for the entity.
 
@@ -77,34 +72,41 @@ class RetrievalService:
 
         if join_keys:
             if len(join_keys) != len(set(join_keys)):
-                duplicates = [
-                    item for item, count in Counter(join_keys).items() if count > 1
-                ]
+                duplicates = [item for item, count in Counter(join_keys).items() if count > 1]
                 raise ValueError(
-                    f"join_keys must be a list of unique join key values. "
-                    f"Found duplicates: {duplicates}"
+                    f"join_keys must be a list of unique join key values. " f"Found duplicates: {duplicates}"
                 )
 
-            # def normalize_join_keys(keys):
-            #     import ast
-            #     from functools import partial
+            def normalize_join_keys(keys):
+                import ast
+                from functools import partial
 
-            #     json_dumps = partial(json.dumps, separators=(", ", ": "))
+                def to_sql_literal(value):
+                    if isinstance(value, str):
+                        escaped = value.replace('"', '""')
+                        return f'"{escaped}"'
+                    return str(value)
 
-            #     normalized = []
-            #     for k in keys:
-            #         if isinstance(k, str):
-            #             try:
-            #                 normalized.append(json_dumps(json.loads(k)))
-            #             except json.JSONDecodeError:
-            #                 normalized.append(json_dumps(ast.literal_eval(k)))
-            #             except Exception:
-            #                 normalized.append(json_dumps(k))
-            #         else:
-            #             normalized.append(json_dumps(k))
-            #     return normalized
+                json_dumps = partial(json.dumps, separators=(", ", ": "))
 
-            # join_keys_parsed = normalize_join_keys(join_keys)
+                normalized = []
+                for k in keys:
+                    if isinstance(k, list):
+                        normalized.append(json_dumps(k))
+                    elif isinstance(k, str) and isinstance(json.loads(k), dict):
+                        try:
+                            normalized.append(json_dumps(json.loads(k)))
+                        except json.JSONDecodeError:
+                            normalized.append(json_dumps(ast.literal_eval(k)))
+                        except Exception:
+                            normalized.append(json_dumps(k))
+                    elif isinstance(k, str):
+                        normalized.append(to_sql_literal(k))
+                    else:
+                        normalized.append(k)
+                return normalized
+
+            join_keys_parsed = normalize_join_keys(join_keys)
             col = JoinKeyValue.value
 
             if self.dialect == "mysql":
@@ -114,9 +116,7 @@ class RetrievalService:
             else:
                 raise NotImplementedError(f"Dialect {self.dialect} not supported")
 
-            join_key_values = self.db.scalars(
-                query.filter(expr.in_(set(join_keys)))
-            ).all()
+            join_key_values = self.db.scalars(query.filter(expr.in_(set(join_keys_parsed)))).all()
             if len(join_key_values) != len(set(join_keys)):
                 raise ValueError(
                     f"Some join keys not found for entity '{entity.name}'. "

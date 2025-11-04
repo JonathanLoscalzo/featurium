@@ -1,0 +1,24 @@
+# Example Featurium Configuration File (TOML format)
+# Copy this to featurium.toml and customize for your needs
+
+[featurium]
+# Database backend: "duckdb" (not supported yet), "sqlite", or "postgresql"
+database_backend = "sqlite"
+
+# For DuckDB or SQLite: path to database file
+database_path = "./featurium.db"
+
+# For PostgreSQL (uncomment and fill these):
+# database_host = "localhost"
+# database_port = 5432
+# database_name = "featurium"
+# database_user = "your_username"
+# database_password = "your_password"
+
+# Or use a full database URL (overrides all other settings):
+# database_url = "sqlite:///path/to/featurium.db"
+# database_url = "postgresql://user:password@localhost:5432/featurium"
+
+# Feature Store settings
+create_tables = true
+echo_sql = false

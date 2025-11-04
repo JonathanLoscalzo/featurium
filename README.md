@@ -27,34 +27,106 @@ Featurium is a lightweight, Python-based feature store designed to simplify the 
 ```bash
 pip install featurium
 ```
-<!--
+
 ### Basic Usage
 
 ```python
-from featurium import FeatureStore
+from featurium import create_feature_store
+from featurium.feature_store.schemas import (
+    ProjectInput, EntityInput, FeatureInput,
+    FeatureValueInput, JoinKeyInput, JoinKeyValueInput
+)
+from featurium.core.models import DataType
 
-# Initialize the feature store
-store = FeatureStore()
-
-# Define a feature
-store.define_feature(
-    name="user_avg_purchase",
-    description="Average purchase amount per user",
-    data_type="float"
+# Create the feature store (using DuckDB by default)
+fs = create_feature_store(
+    database_backend="duckdb",
+    database_path="./featurium.ddb"
 )
 
-# Store features
-store.store_features(
-    feature_name="user_avg_purchase",
-    data=user_purchase_data
-)
+# Register a project
+projects = fs.register_projects([
+    ProjectInput(name="ecommerce", description="E-commerce features")
+])
+
+# Register an entity
+entities = fs.register_entities([
+    EntityInput(name="user", project_id=projects[0].id)
+])
+
+# Register features
+features = fs.register_features([
+    FeatureInput(
+        name="age",
+        project_id=projects[0].id,
+        data_type=DataType.INTEGER,
+        entity_ids=[entities[0].id]
+    ),
+    FeatureInput(
+        name="country",
+        project_id=projects[0].id,
+        data_type=DataType.STRING,
+        entity_ids=[entities[0].id]
+    )
+])
 
 # Retrieve features
-features = store.get_features(
-    feature_names=["user_avg_purchase"],
-    entity_ids=["user1", "user2"]
+from featurium.feature_store.schemas import FeatureRetrievalInput
+
+df = fs.get_feature_values(
+    FeatureRetrievalInput(
+        project_name="ecommerce",
+        entity_name="user",
+        join_keys=[123, 456],
+        feature_names=["age", "country"]
+    )
 )
-``` -->
+```
+
+### Configuration
+
+Featurium supports multiple ways to configure the feature store:
+
+#### 1. Direct Parameters
+```python
+from featurium import create_feature_store
+
+fs = create_feature_store(
+    database_backend="duckdb",
+    database_path="./featurium.ddb"
+)
+```
+
+#### 2. Configuration File (TOML)
+Create a `featurium.toml` file:
+```toml
+[featurium]
+database_backend = "duckdb"
+database_path = "./featurium.ddb"
+create_tables = true
+echo_sql = false
+```
+
+Then load it:
+```python
+from featurium import create_feature_store
+
+fs = create_feature_store(config_file="featurium.toml")
+```
+
+#### 3. Environment Variables
+```bash
+export FEATURIUM_DATABASE_BACKEND=duckdb
+export FEATURIUM_DATABASE_PATH=/path/to/featurium.ddb
+```
+
+```python
+from featurium import create_feature_store
+
+fs = create_feature_store()  # Automatically loads from env vars
+```
+
+For more details, see the [Configuration Guide](docs/CONFIGURATION.md).
 
 ## Project Structure
 

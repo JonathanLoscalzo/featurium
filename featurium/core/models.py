@@ -66,9 +66,7 @@ class ExtraDataMixin:
 class TimestampMixin:
     """Mixin for tracking creation and update timestamps"""
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
@@ -147,14 +145,10 @@ class Attribute(BaseModel):
 
     __tablename__ = "attributes"
 
-    type: Mapped[AttributeType] = mapped_column(
-        SQLEnum(AttributeType), default=AttributeType.FEATURE
-    )
+    type: Mapped[AttributeType] = mapped_column(SQLEnum(AttributeType), default=AttributeType.FEATURE)
 
     # Foreign keys
-    project_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("projects.id"), nullable=True
-    )
+    project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
 
     # Relationships
     project: Mapped[Optional["Project"]] = relationship(back_populates="attributes")
@@ -170,9 +164,7 @@ class Attribute(BaseModel):
     data_type: Mapped[DataType] = mapped_column(SQLEnum(DataType))
     is_label: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    __table_args__ = (
-        UniqueConstraint("project_id", "name", name="ux_attributes_project_id_name"),
-    )
+    __table_args__ = (UniqueConstraint("project_id", "name", name="ux_attributes_project_id_name"),)
 
     def __repr__(self) -> str:
         """String representation of the Attribute model"""
@@ -186,15 +178,11 @@ class AttributeValue(BaseValueModel):
 
     # Columns
     value: Mapped[dict] = mapped_column(JSON)
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
     # Foreign keys
     attribute_id: Mapped[int] = mapped_column(ForeignKey("attributes.id"))
-    join_key_value_id: Mapped[int] = mapped_column(
-        ForeignKey("join_key_values.id"), nullable=True
-    )
+    join_key_value_id: Mapped[int] = mapped_column(ForeignKey("join_key_values.id"), nullable=True)
 
     # Relationships
     attribute: Mapped["Attribute"] = relationship(back_populates="attribute_values")
@@ -214,8 +202,7 @@ class AttributeValue(BaseValueModel):
     def __repr__(self) -> str:
         """String representation of the AttributeValue model"""
         return (
-            f"AttributeValue(id={self.id}, attribute='{self.attribute.name}', "
-            f"value={self.value_scalar})"
+            f"AttributeValue(id={self.id}, attribute='{self.attribute.name}', " f"value={self.value_scalar})"
         )
 
     @property
@@ -231,13 +218,9 @@ class Entity(BaseModel):
     """Entity model representing a business object (e.g., trip)"""
 
     __tablename__ = "entities"
-    __table_args__ = (
-        UniqueConstraint("project_id", "name", name="ux_entities_project_id_name"),
-    )
+    __table_args__ = (UniqueConstraint("project_id", "name", name="ux_entities_project_id_name"),)
     # Foreign keys
-    project_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("projects.id"), nullable=True
-    )
+    project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
 
     # Relationships
     project: Mapped[Optional["Project"]] = relationship(back_populates="entities")
@@ -273,9 +256,7 @@ class JoinKey(BaseModel):
     """JoinKey model storing actual values for join keys"""
 
     __tablename__ = "join_keys"
-    __table_args__ = (
-        UniqueConstraint("entity_id", "name", name="ux_join_keys_entity_id_name"),
-    )
+    __table_args__ = (UniqueConstraint("entity_id", "name", name="ux_join_keys_entity_id_name"),)
 
     # Foreign keys
     entity_id: Mapped[int] = mapped_column(ForeignKey("entities.id"))
@@ -297,17 +278,12 @@ class AttributeEntities(Association):
     __tablename__ = "attribute_entities"
 
     # Foreign keys
-    attribute_id: Mapped[int] = mapped_column(
-        ForeignKey("attributes.id"), primary_key=True
-    )
+    attribute_id: Mapped[int] = mapped_column(ForeignKey("attributes.id"), primary_key=True)
     entity_id: Mapped[int] = mapped_column(ForeignKey("entities.id"), primary_key=True)
 
     def __repr__(self) -> str:
         """String representation of the AttributeEntities model"""
-        return (
-            f"AttributeEntities(attribute_id={self.attribute_id}, "
-            f"entity_id={self.entity_id})"
-        )
+        return f"AttributeEntities(attribute_id={self.attribute_id}, " f"entity_id={self.entity_id})"
 
 
 class JoinKeyValue(BaseValueModel):
@@ -322,7 +298,7 @@ class JoinKeyValue(BaseValueModel):
     join_key: Mapped["JoinKey"] = relationship(back_populates="join_key_values")
 
     # Columns
-    value: Mapped[dict] = mapped_column(JSON)
+    value: Mapped[dict | str | int] = mapped_column(JSON)
 
     # Relación unificada
     attribute_values: Mapped[List["AttributeValue"]] = relationship(

@@ -264,7 +264,7 @@ class JoinKeyValueOutput(BaseModel):
 
     id: int
     join_key_id: int
-    value: dict
+    value: dict | str | int
     created_at: datetime
     updated_at: datetime
     meta: Optional[dict] = None
@@ -278,7 +278,7 @@ class FeatureValueOutput(BaseModel):
     id: int
     attribute_id: int
     join_key_value_id: int
-    value: dict
+    value: dict | str | int
     timestamp: datetime
     created_at: datetime
     updated_at: datetime
